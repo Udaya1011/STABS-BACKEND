@@ -10,23 +10,26 @@ const protect = async (req, res, next) => {
     ) {
         try {
             token = req.headers.authorization.split(' ')[1];
+            console.log('Verifying Token:', token.substring(0, 10) + '...');
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Decoded Token:', decoded);
             req.user = await User.findById(decoded.id).select('-password');
             if (!req.user) {
+                console.log('User not found in DB for ID:', decoded.id);
                 res.status(401);
                 return next(new Error('Not authorized, user not found'));
             }
+            console.log('Authenticated User:', req.user.email, 'Role:', req.user.role);
             return next();
         } catch (error) {
-            console.error('Auth Middleware Error:', error.message);
+            console.error('Auth Middleware Error (Token Verification):', error.message);
             res.status(401);
-            return next(new Error('Not authorized, token failed'));
+            return next(new Error('Not authorized, token failed: ' + error.message));
         }
     }
 
     if (!token) {
         console.warn('Auth missing for:', req.method, req.originalUrl);
-        console.warn('Headers:', JSON.stringify(req.headers, null, 2));
         res.status(401);
         return next(new Error('Not authorized, no token'));
     }
@@ -36,6 +39,7 @@ const admin = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
         next();
     } else {
+        console.warn('Admin Access Denied for:', req.user?.email, 'Role:', req.user?.role);
         res.status(401);
         next(new Error('Not authorized as an admin'));
     }
