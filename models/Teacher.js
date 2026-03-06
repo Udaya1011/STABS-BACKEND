@@ -21,6 +21,7 @@ const teacherSchema = new mongoose.Schema({
             start: String, // format HH:mm
             end: String,
             isBooked: { type: Boolean, default: false },
+            subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }
         }],
     }],
     officeHours: String,

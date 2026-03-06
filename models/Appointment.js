@@ -33,11 +33,12 @@ const appointmentSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected', 'rescheduled', 'completed', 'available'],
+        enum: ['pending', 'approved', 'rejected', 'rescheduled', 'completed', 'available', 'cancelled'],
         default: 'pending',
     },
     meetingLink: String,
     teacherNote: String,
+    cancelReason: String,
     priority: {
         type: String,
         enum: ['low', 'medium', 'high', 'urgent'],

@@ -92,6 +92,7 @@ const getMyAppointments = async (req, res) => {
     } else if (req.user.role === 'teacher') {
         appointments = await Appointment.find({ teacher: req.user._id })
             .populate('student', 'name email avatar')
+            .populate('teacher', 'name email avatar')
             .populate('subject', 'name code');
     } else {
         appointments = await Appointment.find({})
@@ -150,6 +151,18 @@ const updateAppointmentStatus = async (req, res) => {
 const createFreeSlot = async (req, res) => {
     const { date, startTime, endTime } = req.body;
 
+    // Check for duplicates
+    const existing = await Appointment.findOne({
+        teacher: req.user._id,
+        date,
+        startTime
+    });
+
+    if (existing) {
+        res.status(400);
+        throw new Error('You already have a session or slot scheduled for this time.');
+    }
+
     const slot = await Appointment.create({
         teacher: req.user._id,
         date,
@@ -171,12 +184,16 @@ const createFreeSlot = async (req, res) => {
 // @route   GET /api/appointments/slots
 // @access  Private
 const getAvailableSlots = async (req, res) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     const slots = await Appointment.find({
         status: 'available',
         appointmentType: 'slot',
-        date: { $gte: new Date() }
+        date: { $gte: today }
     })
         .populate('teacher', 'name email avatar')
+        .populate('subject', 'name code')
         .sort({ date: 1, startTime: 1 });
 
     res.json(slots);
@@ -196,7 +213,7 @@ const bookSlot = async (req, res) => {
 
     appointment.student = req.user._id;
     appointment.status = 'approved'; // Auto-approve since teacher opened it
-    appointment.appointmentType = 'appointment';
+    appointment.appointmentType = 'slot'; // Keep as slot for tracking in free slots view
     appointment.reason = reason;
     appointment.priority = priority;
     appointment.subject = subject;
@@ -225,6 +242,48 @@ const bookSlot = async (req, res) => {
     res.json(updated);
 };
 
+// @desc    Cancel a slot (Teacher only)
+// @route   PUT /api/appointments/slots/:id/cancel
+// @access  Private/Teacher
+const cancelSlot = async (req, res) => {
+    const { reason } = req.body;
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+        res.status(404);
+        throw new Error('Slot not found');
+    }
+
+    if (appointment.teacher.toString() !== req.user._id.toString()) {
+        res.status(401);
+        throw new Error('Not authorized to cancel this slot');
+    }
+
+    appointment.status = 'cancelled';
+    appointment.cancelReason = reason;
+    const updated = await appointment.save();
+
+    // If there was a student, notify them
+    if (appointment.student) {
+        const notification = await Notification.create({
+            recipient: appointment.student,
+            sender: req.user._id,
+            type: 'appointment_update',
+            title: 'Appointment Cancelled',
+            message: `Teacher cancelled the appointment: ${reason || 'No reason provided'}`,
+            relatedId: appointment._id,
+        });
+
+        const io = req.app.get('socketio');
+        if (io && notification) {
+            const populatedNotif = await Notification.findById(notification._id).populate('sender', 'name avatar');
+            io.to(appointment.student.toString()).emit('newNotification', populatedNotif);
+        }
+    }
+
+    res.json(updated);
+};
+
 module.exports = {
     bookAppointment,
     getMyAppointments,
@@ -232,4 +291,5 @@ module.exports = {
     createFreeSlot,
     getAvailableSlots,
     bookSlot,
+    cancelSlot,
 };

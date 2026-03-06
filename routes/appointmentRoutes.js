@@ -6,6 +6,7 @@ const {
     createFreeSlot,
     getAvailableSlots,
     bookSlot,
+    cancelSlot,
 } = require('../controllers/appointmentController');
 const { protect, student, teacher } = require('../middleware/authMiddleware');
 
@@ -21,6 +22,9 @@ router.route('/slots')
 
 router.route('/slots/:id/book')
     .put(protect, student, bookSlot);
+
+router.route('/slots/:id/cancel')
+    .put(protect, teacher, cancelSlot);
 
 router.route('/:id/status')
     .put(protect, teacher, updateAppointmentStatus);
