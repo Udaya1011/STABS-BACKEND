@@ -119,9 +119,9 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
     try {
         await connectDB();
-        const PORT = process.env.PORT || 5000;
-        const serverInstance = server.listen(PORT, () => {
-            console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+        const PORT = process.env.PORT || 5006;
+        const serverInstance = server.listen(PORT, '0.0.0.0', () => {
+            console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
         });
         serverInstance.timeout = 600000; // 10 minutes timeout for large uploads
     } catch (error) {
