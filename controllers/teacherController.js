@@ -16,14 +16,14 @@ const syncFreeSlots = async (teacherId, userId, availability) => {
 
         const slotsToCreate = [];
         const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        
+
         // 2. Generate slots for TODAY ONLY
         const now = new Date();
         const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
+
         const dayName = daysOfWeek[date.getDay()];
         console.log(`Syncing slots for ${dayName} (${date.toDateString()}) for teacher ${userId}`);
-        
+
         const daySchedule = availability.find(d => d.day === dayName);
 
         if (daySchedule && daySchedule.slots) {
@@ -42,7 +42,7 @@ const syncFreeSlots = async (teacherId, userId, availability) => {
                 }
             });
         }
-        
+
         let createdCount = 0;
         if (slotsToCreate.length > 0) {
             for (const slot of slotsToCreate) {
@@ -91,10 +91,21 @@ const updateTeacherProfile = async (req, res) => {
     const teacher = await Teacher.findOne({ user: req.user._id });
 
     if (teacher) {
-        teacher.designation = req.body.designation || teacher.designation;
-        teacher.qualifications = req.body.qualifications || teacher.qualifications;
-        teacher.officeHours = req.body.officeHours || teacher.officeHours;
-        teacher.maxAppointmentsPerDay = req.body.maxAppointmentsPerDay || teacher.maxAppointmentsPerDay;
+        console.log(`[PROFILE UPDATE] User: ${req.user._id}. New Phone: ${req.body.phoneNumber}`);
+        teacher.set({
+            designation: req.body.designation || teacher.designation,
+            qualifications: req.body.qualifications || teacher.qualifications,
+            phoneNumber: req.body.phoneNumber || req.body.officeHours || teacher.phoneNumber,
+            specialization: req.body.specialization || teacher.specialization,
+            maxAppointmentsPerDay: req.body.maxAppointmentsPerDay || teacher.maxAppointmentsPerDay
+        });
+
+        const user = await User.findById(teacher.user);
+        if (user) {
+            user.phone = req.body.phoneNumber || req.body.officeHours || user.phone;
+            user.bio = req.body.specialization || user.bio;
+            await user.save();
+        }
 
         const updatedTeacher = await teacher.save();
         res.json(updatedTeacher);
@@ -113,10 +124,10 @@ const updateAvailability = async (req, res) => {
     if (teacher) {
         teacher.availability = req.body.availability;
         const updatedTeacher = await teacher.save();
-        
+
         // Sync free slots to appointment system
         await syncFreeSlots(teacher._id, req.user._id, req.body.availability);
-        
+
         res.json(updatedTeacher);
     } else {
         res.status(404);
@@ -132,7 +143,7 @@ const getTeachers = async (req, res) => {
         .populate({
             path: 'user',
             select: 'name email department avatar',
-            populate: { path: 'department', select: 'name' }
+            populate: { path: 'department', select: 'name programme' }
         })
         .populate('subjects');
     res.json(teachers);
@@ -145,22 +156,35 @@ const adminUpdateTeacher = async (req, res) => {
     const teacher = await Teacher.findById(req.params.id);
 
     if (teacher) {
+        console.log(`[ADMIN UPDATE] TeacherID: ${req.params.id}. New Phone: ${req.body.phoneNumber}`);
         // Update Teacher model fields
-        teacher.designation = req.body.designation || teacher.designation;
-        teacher.qualifications = req.body.qualifications || teacher.qualifications;
-        teacher.officeHours = req.body.officeHours || teacher.officeHours;
+        teacher.set({
+            designation: req.body.designation || teacher.designation,
+            qualifications: req.body.qualifications || teacher.qualifications,
+            phoneNumber: req.body.phoneNumber || req.body.officeHours || teacher.phoneNumber,
+            specialization: req.body.specialization || teacher.specialization
+        });
 
         // Update User model fields if provided
         const user = await User.findById(teacher.user);
         if (user) {
             user.name = req.body.name || user.name;
             user.email = req.body.email || user.email;
+            user.phone = req.body.phoneNumber || req.body.officeHours || user.phone;
+            user.bio = req.body.specialization || user.bio;
             if (req.body.department) user.department = req.body.department;
             await user.save();
         }
 
         const updatedTeacher = await teacher.save();
-        res.json(updatedTeacher);
+        const populatedTeacher = await Teacher.findById(updatedTeacher._id)
+            .populate({
+                path: 'user',
+                select: 'name email department avatar',
+                populate: { path: 'department', select: 'name programme' }
+            })
+            .populate('subjects');
+        res.json(populatedTeacher);
     } else {
         res.status(404);
         throw new Error('Teacher not found');
@@ -180,7 +204,7 @@ const adminUpdateTimetable = async (req, res) => {
             .populate({
                 path: 'user',
                 select: 'name email department avatar',
-                populate: { path: 'department', select: 'name' }
+                populate: { path: 'department', select: 'name programme' }
             })
             .populate('subjects')
             .populate({
@@ -199,8 +223,8 @@ const adminUpdateTimetable = async (req, res) => {
         res.json(updatedTeacher);
     } catch (err) {
         console.error('Error updating timetable:', err);
-        res.status(500).json({ 
-            message: 'Server error while updating timetable', 
+        res.status(500).json({
+            message: 'Server error while updating timetable',
             error: err.message,
             details: err.errors // If it's a validation error
         });
@@ -233,9 +257,9 @@ const syncMyFreeSlots = async (req, res) => {
         if (teacher) {
             console.log('Teacher profile found:', teacher._id);
             const count = await syncFreeSlots(teacher._id, req.user._id, teacher.availability);
-            res.json({ 
+            res.json({
                 message: count > 0 ? `${count} slots synchronized successfully` : 'Already in sync - No new free slots found',
-                count 
+                count
             });
         } else {
             console.warn('Teacher profile NOT FOUND for user ID:', req.user._id);

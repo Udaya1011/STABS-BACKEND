@@ -53,7 +53,7 @@ const registerUser = async (req, res, next) => {
         const {
             name, email, password, role,
             registerNumber, department, academicYear, semester,
-            designation, qualifications, officeHours
+            designation, qualifications, phoneNumber, specialization
         } = req.body;
 
         const userExists = await User.findOne({ email });
@@ -84,7 +84,8 @@ const registerUser = async (req, res, next) => {
                     user: user._id,
                     designation,
                     qualifications,
-                    officeHours,
+                    phoneNumber,
+                    specialization,
                 });
             }
 

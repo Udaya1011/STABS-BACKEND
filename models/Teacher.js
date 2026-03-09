@@ -24,11 +24,12 @@ const teacherSchema = new mongoose.Schema({
             subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }
         }],
     }],
-    officeHours: String,
+    phoneNumber: String,
     maxAppointmentsPerDay: {
         type: Number,
         default: 10,
     },
+    specialization: String,
 }, { timestamps: true });
 
 module.exports = mongoose.model('Teacher', teacherSchema);

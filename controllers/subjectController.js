@@ -4,7 +4,7 @@ const Subject = require('../models/Subject');
 // @route   GET /api/subjects
 // @access  Private
 const getSubjects = async (req, res) => {
-    const subjects = await Subject.find({}).populate('department', 'name').populate('teachers', 'name email');
+    const subjects = await Subject.find({}).populate('department', 'name code programme').populate('teachers', 'name email');
     res.json(subjects);
 };
 
@@ -31,7 +31,8 @@ const createSubject = async (req, res) => {
     });
 
     if (subject) {
-        res.status(201).json(subject);
+        const populatedSubject = await Subject.findById(subject._id).populate('department', 'name code programme').populate('teachers', 'name email');
+        res.status(201).json(populatedSubject);
     } else {
         res.status(400);
         throw new Error('Invalid subject data');
@@ -53,7 +54,8 @@ const updateSubject = async (req, res) => {
         subject.teachers = req.body.teachers || subject.teachers;
 
         const updatedSubject = await subject.save();
-        res.json(updatedSubject);
+        const populatedSubject = await Subject.findById(updatedSubject._id).populate('department', 'name code programme').populate('teachers', 'name email');
+        res.json(populatedSubject);
     } else {
         res.status(404);
         throw new Error('Subject not found');

@@ -20,17 +20,19 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
     // Check file extension
-    const filetypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mov|mp3|wav/;
+    const filetypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mov|webm|ogg|mp3|wav/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
 
-    // Check mimetype (more broad than previous)
-    const mimetypes = /image|pdf|msword|vnd.openxmlformats-officedocument|vnd.ms-excel|vnd.ms-powerpoint|text|zip|video|audio/;
-    const mimetype = mimetypes.test(file.mimetype);
+    // Check mimetype (broad prefix match for media types)
+    const mimetype = file.mimetype.startsWith('video/') || 
+                    file.mimetype.startsWith('audio/') || 
+                    /image|pdf|msword|vnd.openxmlformats-officedocument|vnd.ms-excel|vnd.ms-powerpoint|text|zip|application\/octet-stream/.test(file.mimetype);
 
-    if (extname && mimetype) {
+    if (extname || mimetype) {
         return cb(null, true);
     } else {
-        cb(new Error('This file type is not allowed! Supported: Images, PDFs, Docs, Excel, PPT, TXT, Videos, Audio, ZIP.'));
+        console.error(`Upload Rejected: ext: ${path.extname(file.originalname)}, mimetype: ${file.mimetype}`);
+        cb(new Error('This file type is not allowed! Supported: Images, Voice Notes, PDFs, Docs, Excel, PPT, TXT, Videos, Audio, ZIP.'));
     }
 };
 

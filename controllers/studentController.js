@@ -9,7 +9,7 @@ const getStudents = async (req, res) => {
         .populate({
             path: 'user',
             select: 'name email department avatar',
-            populate: { path: 'department', select: 'name' }
+            populate: { path: 'department', select: 'name programme' }
         })
         .populate('attendance.subject', 'name code');
 
