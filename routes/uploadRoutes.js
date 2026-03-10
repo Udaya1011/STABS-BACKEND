@@ -16,8 +16,8 @@ router.post('/', protect, (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        // Return relative URL for best compatibility with Vite proxy
-        const url = `/uploads/${req.file.filename}`;
+        // Cloudinary returns the full URL in req.file.path
+        const url = req.file.path;
 
         res.json({
             message: 'File uploaded successfully',
