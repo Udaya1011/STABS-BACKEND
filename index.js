@@ -30,6 +30,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const videoRoutes = require('./routes/videoRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const registryRoutes = require('./routes/registryRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
 
 const uploadRoutes = require('./routes/uploadRoutes');
 
@@ -81,6 +82,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/registry', registryRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

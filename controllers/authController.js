@@ -217,11 +217,21 @@ const updateUserProfile = async (req, res, next) => {
     }
 };
 
+const getStaff = async (req, res, next) => {
+    try {
+        const staff = await User.find({ role: 'staff' }).populate('department', 'name');
+        res.json(staff);
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     authUser,
     registerUser,
     getUserProfile,
     updateUserProfile,
+    getStaff,
 };
 
 

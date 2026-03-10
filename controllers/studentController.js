@@ -5,7 +5,12 @@ const User = require('../models/User');
 // @route   GET /api/students
 // @access  Private/Admin
 const getStudents = async (req, res) => {
-    const students = await Student.find({})
+    const query = {};
+    if (req.query.subjectId) {
+        query.subjects = req.query.subjectId;
+    }
+
+    const students = await Student.find(query)
         .populate({
             path: 'user',
             select: 'name email department avatar',

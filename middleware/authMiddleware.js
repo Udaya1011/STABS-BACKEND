@@ -63,4 +63,13 @@ const student = (req, res, next) => {
     }
 };
 
-module.exports = { protect, admin, teacher, student };
+const staff = (req, res, next) => {
+    if (req.user && (req.user.role === 'staff' || req.user.role === 'admin')) {
+        next();
+    } else {
+        res.status(401);
+        next(new Error('Not authorized as staff'));
+    }
+};
+
+module.exports = { protect, admin, teacher, student, staff };
