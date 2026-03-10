@@ -91,12 +91,41 @@ io.on('connection', (socket) => {
 
     socket.on('join', (userId) => {
         socket.join(userId);
+        socket.userId = userId;
         console.log(`User ${userId} joined their private room`);
     });
 
     socket.on('sendMessage', (data) => {
         const { receiverId, message } = data;
         io.to(receiverId).emit('newMessage', message);
+    });
+
+    // WebRTC Signaling Events
+    socket.on('rtc-offer', (data) => {
+        const { to, offer, senderName, callType } = data;
+        const from = data.from || socket.userId;
+        console.log(`[WebRTC] OFFER from ${from} to ${to} (Sender: ${senderName}, Type: ${callType || 'voice'})`);
+        io.to(to).emit('rtc-offer', { from, offer, senderName, callType });
+    });
+
+    socket.on('rtc-answer', (data) => {
+        const { to, answer } = data;
+        const from = data.from || socket.userId;
+        console.log(`[WebRTC] ANSWER from ${from} to ${to}`);
+        io.to(to).emit('rtc-answer', { answer });
+    });
+
+    socket.on('rtc-candidate', (data) => {
+        const { to, candidate } = data;
+        const from = data.from || socket.userId;
+        console.log(`[WebRTC] ICE CANDIDATE from ${from} to ${to}`);
+        io.to(to).emit('rtc-candidate', { candidate });
+    });
+
+    socket.on('rtc-end', (data) => {
+        const { to } = data;
+        console.log(`[WebRTC] END CALL to ${to}`);
+        io.to(to).emit('rtc-end');
     });
 
     socket.on('disconnect', () => {
