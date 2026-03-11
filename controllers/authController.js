@@ -9,31 +9,47 @@ const sendEmail = require('../utils/sendEmail');
 // @access  Public
 const authUser = async (req, res, next) => {
     try {
-        const { email, password } = req.body; // 'email' field acts as loginIdentifier
+        const { email, password } = req.body;
 
         const user = await User.findOne({
             $or: [
                 { email: email.trim() },
                 { username: email.trim() }
             ]
-        });
-
-        console.log('Login attempt identifier:', `[${email}]`);
-        if (!user) {
-            console.log('User not found for identifier');
-        } else {
-            const isMatch = await user.matchPassword(password);
-            console.log('User found:', user.email);
-            console.log('Password match result:', isMatch);
-        }
+        }).populate('department', 'name programme');
 
         if (user && (await user.matchPassword(password))) {
+            let extraData = {};
+            
+            if (user.role === 'student') {
+                const studentProfile = await Student.findOne({ user: user._id })
+                    .populate('attendance.subject', 'name code');
+                if (studentProfile) {
+                    extraData = {
+                        studentId: studentProfile._id,
+                        registerNumber: studentProfile.registerNumber,
+                        attendance: studentProfile.attendance,
+                        semester: studentProfile.semester
+                    };
+                }
+            } else if (user.role === 'teacher') {
+                const teacherProfile = await Teacher.findOne({ user: user._id });
+                if (teacherProfile) {
+                    extraData = {
+                        teacherId: teacherProfile._id,
+                        designation: teacherProfile.designation
+                    };
+                }
+            }
+
             res.json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
                 avatar: user.avatar,
+                department: user.department,
+                ...extraData,
                 token: generateToken(user._id),
             });
         } else {

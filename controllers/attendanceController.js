@@ -13,6 +13,25 @@ exports.submitAttendance = async (req, res) => {
             return res.status(400).json({ message: 'Missing subject or attendance data' });
         }
 
+        // 0. Check for duplicate attendance for the same slot/date/subject
+        const searchDate = new Date(date || new Date());
+        searchDate.setHours(0, 0, 0, 0);
+        
+        const existingAttendance = await Attendance.findOne({
+            subject: subjectId,
+            slot: slot,
+            date: {
+                $gte: searchDate,
+                $lt: new Date(searchDate.getTime() + 24 * 60 * 60 * 1000)
+            }
+        });
+
+        if (existingAttendance) {
+            return res.status(400).json({ 
+                message: `Attendance has already been marked for this subject in slot ${slot} on this date.` 
+            });
+        }
+
         // 1. Create the attendance record
         const attendanceRecord = await Attendance.create({
             subject: subjectId,
@@ -30,7 +49,7 @@ exports.submitAttendance = async (req, res) => {
             const student = await Student.findOne({ _id: item.studentId });
             if (student) {
                 // Find or create subject summary in student's record
-                let subjectSummary = student.attendance.find(a => a.subject.toString() === subjectId);
+                let subjectSummary = student.attendance.find(a => a.subject && a.subject.toString() === subjectId);
                 
                 if (!subjectSummary) {
                     subjectSummary = {
@@ -40,7 +59,8 @@ exports.submitAttendance = async (req, res) => {
                         percentage: 0
                     };
                     student.attendance.push(subjectSummary);
-                    subjectSummary = student.attendance[student.attendance.length - 1]; // get the reference to the pushed object
+                    // Get the newly added summary
+                    subjectSummary = student.attendance[student.attendance.length - 1];
                 }
 
                 subjectSummary.totalClasses += 1;
@@ -49,7 +69,9 @@ exports.submitAttendance = async (req, res) => {
                 }
                 
                 // Recalculate percentage
-                subjectSummary.percentage = (subjectSummary.attendedClasses / subjectSummary.totalClasses) * 100;
+                if (subjectSummary.totalClasses > 0) {
+                    subjectSummary.percentage = Math.round((subjectSummary.attendedClasses / subjectSummary.totalClasses) * 100);
+                }
                 
                 await student.save();
             }
@@ -60,8 +82,8 @@ exports.submitAttendance = async (req, res) => {
             data: attendanceRecord
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error marking attendance' });
+        console.error('Attendance Submission Error:', error);
+        res.status(500).json({ message: error.message || 'Server error marking attendance' });
     }
 };
 
