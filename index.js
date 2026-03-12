@@ -22,7 +22,12 @@ const io = socketio(server, {
         methods: ['GET', 'POST'],
         credentials: true
     },
-    transports: ['polling', 'websocket']
+    transports: ['polling', 'websocket'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    connectTimeout: 45000,
+    allowUpgrades: true,
+    cookie: false
 });
 
 const authRoutes = require('./routes/authRoutes');
