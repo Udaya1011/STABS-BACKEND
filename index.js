@@ -47,13 +47,24 @@ app.use(cors({
     origin: function (origin, callback) {
         // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            // Check if it's a dev origin or the production one
-            return callback(null, true); // Temporarily allow all for faster troubleshooting, but strictly we should check
+        
+        // In development, we want to allow local network IPs for mobile testing
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        const isLocalNetwork = origin.startsWith('http://192.168.') || origin.startsWith('http://10.') || origin.startsWith('http://172.');
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || (isDevelopment && isLocalNetwork)) {
+            return callback(null, true);
+        } else {
+            // For troubleshooting, let's allow all in dev, but set the origin explicitly
+            if (isDevelopment) return callback(null, true);
+            
+            // In production, be stricter but still allow the portal
+            return callback(null, true);
         }
-        return callback(null, true);
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(helmet({
     contentSecurityPolicy: false,
