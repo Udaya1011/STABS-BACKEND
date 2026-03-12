@@ -242,12 +242,100 @@ const getStaff = async (req, res, next) => {
     }
 };
 
+const saveFaceDescriptor = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (user) {
+            user.faceDescriptor = req.body.faceDescriptor;
+            await user.save();
+            res.json({ message: 'Face descriptor saved successfully' });
+        } else {
+            res.status(404);
+            throw new Error('User not found');
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+const loginWithFace = async (req, res, next) => {
+    try {
+        const { faceDescriptor } = req.body;
+
+        if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
+            res.status(400);
+            throw new Error('Invalid face descriptor');
+        }
+
+        const THRESHOLD = 0.5;
+        const users = await User.find({ faceDescriptor: { $ne: null } }).populate('department', 'name programme');
+
+        let matchedUser = null;
+        let minDistance = Infinity;
+
+        for (const user of users) {
+             const dist = Math.sqrt(
+                 user.faceDescriptor.reduce((acc, val, i) => acc + Math.pow(val - faceDescriptor[i], 2), 0)
+             );
+             if (dist < minDistance) {
+                 minDistance = dist;
+                 matchedUser = user;
+             }
+        }
+
+        if (matchedUser && minDistance <= THRESHOLD) {
+            let extraData = {};
+            
+            if (matchedUser.role === 'student') {
+                const studentProfile = await Student.findOne({ user: matchedUser._id })
+                    .populate('attendance.subject', 'name code');
+                if (studentProfile) {
+                    extraData = {
+                        studentId: studentProfile._id,
+                        registerNumber: studentProfile.registerNumber,
+                        attendance: studentProfile.attendance,
+                        semester: studentProfile.semester
+                    };
+                }
+            } else if (matchedUser.role === 'teacher') {
+                const teacherProfile = await Teacher.findOne({ user: matchedUser._id });
+                if (teacherProfile) {
+                    extraData = {
+                        teacherId: teacherProfile._id,
+                        designation: teacherProfile.designation
+                    };
+                }
+            }
+
+            res.json({
+                _id: matchedUser._id,
+                name: matchedUser.name,
+                email: matchedUser.email,
+                role: matchedUser.role,
+                avatar: matchedUser.avatar,
+                department: matchedUser.department,
+                ...extraData,
+                token: generateToken(matchedUser._id),
+            });
+        } else {
+            res.status(401);
+            throw new Error('Face not recognized or not registered');
+        }
+
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     authUser,
     registerUser,
     getUserProfile,
     updateUserProfile,
     getStaff,
+    saveFaceDescriptor,
+    loginWithFace,
 };
 
 

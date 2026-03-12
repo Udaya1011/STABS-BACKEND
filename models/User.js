@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  faceDescriptor: {
+    type: [Number],
+    default: null,
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
