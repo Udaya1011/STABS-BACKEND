@@ -11,14 +11,22 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'stabs_uploads',
-        resource_type: 'auto', // Important for handling videos/audio as well as images
-        allowed_formats: ['jpeg', 'jpg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', 'mp4', 'mov', 'webm', 'ogg', 'mp3', 'wav'],
-        public_id: (req, file) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            return file.fieldname + '-' + uniqueSuffix;
+    params: async (req, file) => {
+        // Use 'auto' to let Cloudinary determine the type, 
+        // but force 'raw' for documents to ensure they aren't rejected
+        let resource_type = 'auto';
+        const mimetype = file.mimetype;
+        
+        if (mimetype.includes('pdf') || mimetype.includes('word') || mimetype.includes('officedocument') || mimetype.includes('text')) {
+            resource_type = 'raw';
         }
+
+        return {
+            folder: 'stabs_uploads',
+            resource_type: resource_type,
+            allowed_formats: undefined, // undefined allows all formats within the resource_type
+            public_id: file.fieldname + '-' + Date.now() + '-' + Math.round(Math.random() * 1E9)
+        };
     },
 });
 
