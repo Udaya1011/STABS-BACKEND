@@ -11,11 +11,16 @@ const connectDB = require('./config/db');
 // Database connection managed via startServer() below
 
 const app = express();
+app.set('trust proxy', 1); // Trust Render proxy
 const server = http.createServer(app);
 const io = socketio(server, {
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true);
+            callback(null, origin);
+        },
+        methods: ['GET', 'POST'],
+        credentials: true
     }
 });
 
@@ -45,22 +50,13 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
+        // Echo the origin back to the client - this is the most robust for mobile
         if (!origin) return callback(null, true);
-        
-        const isLocalNetwork = origin.startsWith('http://192.168.') || 
-                               origin.startsWith('http://10.') || 
-                               origin.startsWith('http://172.');
-        
-        if (allowedOrigins.indexOf(origin) !== -1 || isLocalNetwork || process.env.NODE_ENV !== 'production') {
-            callback(null, true);
-        } else {
-            callback(null, true); // Allow all during debug phase
-        }
+        callback(null, origin);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'Cache-Control', 'Pragma']
 }));
 app.use(helmet({
     contentSecurityPolicy: false,
