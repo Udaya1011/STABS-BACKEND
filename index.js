@@ -21,7 +21,8 @@ const io = socketio(server, {
         },
         methods: ['GET', 'POST'],
         credentials: true
-    }
+    },
+    transports: ['polling', 'websocket']
 });
 
 const authRoutes = require('./routes/authRoutes');
