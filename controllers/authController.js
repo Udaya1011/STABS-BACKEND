@@ -274,15 +274,20 @@ const loginWithFace = async (req, res, next) => {
         let matchedUser = null;
         let minDistance = Infinity;
 
+        console.log(`Starting face login. Checking against ${users.length} users with face descriptors.`);
+        
         for (const user of users) {
              const dist = Math.sqrt(
                  user.faceDescriptor.reduce((acc, val, i) => acc + Math.pow(val - faceDescriptor[i], 2), 0)
              );
+             console.log(`User ${user.email} face distance: ${dist}`);
              if (dist < minDistance) {
                  minDistance = dist;
                  matchedUser = user;
              }
         }
+
+        console.log(`Min distance found: ${minDistance}. Threshold: ${THRESHOLD}. User matched: ${matchedUser ? matchedUser.email : 'None'}`);
 
         if (matchedUser && minDistance <= THRESHOLD) {
             let extraData = {};
