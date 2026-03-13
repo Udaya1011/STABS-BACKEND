@@ -1,35 +1,26 @@
 const multer = require('multer');
-const { GridFsStorage } = require('multer-gridfs-storage');
-const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 
-// Re-use logic to get connection URI
-const mongoURI = process.env.MONGO_URI;
-
-// Create storage engine
-const storage = new GridFsStorage({
-    url: mongoURI,
-    options: { useUnifiedTopology: true },
-    file: (req, file) => {
-        return new Promise((resolve, reject) => {
-            crypto.randomBytes(16, (err, buf) => {
-                if (err) {
-                    return reject(err);
-                }
-                const filename = buf.toString('hex') + path.extname(file.originalname);
-                const fileInfo = {
-                    filename: filename,
-                    bucketName: 'uploads'
-                };
-                resolve(fileInfo);
-            });
-        });
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Use process.cwd() to be absolutely certain of the root directory
+        const uploadsDir = path.join(process.cwd(), 'uploads');
+        try {
+            if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+            cb(null, uploadsDir);
+        } catch (err) {
+            console.error('CRITICAL: FAILED TO CREATE UPLOADS DIR', err);
+            cb(err);
+        }
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = path.extname(file.originalname || '') || '.dat';
+        cb(null, `file-${uniqueSuffix}${ext}`);
     }
-});
-
-// Log if storage has an error
-storage.on('connectionError', (err) => {
-    console.error('STORAGE CONNECTION ERROR:', err);
 });
 
 const upload = multer({

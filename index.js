@@ -78,6 +78,25 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
+// Fallback for static files to GridFS
+const { getGridfsBucket } = require('./config/db');
+app.get('/uploads/:filename', async (req, res, next) => {
+    try {
+        const bucket = getGridfsBucket();
+        if (!bucket) return next();
+
+        const files = await bucket.find({ filename: req.params.filename }).toArray();
+        if (!files || files.length === 0) return next();
+
+        res.set('Content-Type', files[0].contentType || 'application/octet-stream');
+        const downloadStream = bucket.openDownloadStreamByName(req.params.filename);
+        downloadStream.pipe(res);
+        downloadStream.on('error', () => res.status(500).send('Error streaming file'));
+    } catch (error) {
+        next();
+    }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
@@ -147,14 +166,16 @@ io.on('connection', (socket) => {
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
-    console.error('--- GLOBAL ERROR ---');
+    console.error(`--- GLOBAL ERROR [${req.method} ${req.url}] ---`);
     console.error('Message:', err.message);
     if (err.code) console.error('Code:', err.code);
     console.error('Stack:', err.stack);
 
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
     res.status(statusCode).json({
-        message: err.message,
+        message: err.message || 'Internal Server Error',
+        url: req.url,
+        method: req.method,
         stack: process.env.NODE_ENV === 'production' ? null : err.stack,
     });
 });

@@ -25,6 +25,20 @@ const connectDB = async () => {
 };
 
 const getGfs = () => gfs;
-const getGridfsBucket = () => gridfsBucket;
+const getGridfsBucket = () => {
+    if (gridfsBucket && mongoose.connection.readyState === 1) {
+        return gridfsBucket;
+    }
+    
+    // If we have a connection but no bucket (or stale bucket), re-initialize
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+        gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+            bucketName: 'uploads'
+        });
+        return gridfsBucket;
+    }
+    
+    return null;
+};
 
 module.exports = { connectDB, getGfs, getGridfsBucket };

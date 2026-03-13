@@ -7,6 +7,7 @@ const {
     getAvailableSlots,
     bookSlot,
     cancelSlot,
+    syncTimetableSlots,
 } = require('../controllers/appointmentController');
 const { protect, student, teacher } = require('../middleware/authMiddleware');
 
@@ -15,6 +16,9 @@ const router = express.Router();
 router.route('/')
     .get(protect, getMyAppointments)
     .post(protect, student, bookAppointment);
+
+router.route('/sync-slots')
+    .post(protect, teacher, syncTimetableSlots);
 
 router.route('/slots')
     .get(protect, getAvailableSlots)

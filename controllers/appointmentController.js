@@ -284,6 +284,87 @@ const cancelSlot = async (req, res) => {
     res.json(updated);
 };
 
+// @desc    Sync timetable free periods to appointment slots (Teacher only)
+// @route   POST /api/appointments/sync-slots
+// @access  Private/Teacher
+const syncTimetableSlots = async (req, res) => {
+    const Teacher = require('../models/Teacher');
+    const teacherProfile = await Teacher.findOne({ user: req.user._id });
+
+    if (!teacherProfile) {
+        res.status(404);
+        throw new Error('Teacher profile not found');
+    }
+
+    if (!teacherProfile.availability || teacherProfile.availability.length === 0) {
+        res.status(400);
+        throw new Error('No timetable/availability found to sync.');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // REMOVE FINISHED DAYS: Delete available slots that are older than today
+    await Appointment.deleteMany({
+        teacher: req.user._id,
+        status: 'available',
+        appointmentType: 'slot',
+        date: { $lt: today }
+    });
+
+    const createdSlots = [];
+    const dayMapping = {
+        'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+        'Thursday': 4, 'Friday': 5, 'Saturday': 6
+    };
+
+    // Iterate through teacher's availability (timetable)
+    for (const dayAvail of teacherProfile.availability) {
+        const dayName = dayAvail.day;
+        const targetDayIndex = dayMapping[dayName];
+
+        if (targetDayIndex === undefined) continue;
+
+        // Calculate the next occurrence of this day within the next 7 days
+        let targetDate = new Date(today);
+        let daysUntilTarget = (targetDayIndex - today.getDay() + 7) % 7;
+        
+        // If it's today, we might want to sync for today or next week.
+        // Let's assume we sync for the upcoming occurrence (including today if it's earlier in the day)
+        targetDate.setDate(today.getDate() + daysUntilTarget);
+
+        for (const slot of dayAvail.slots) {
+            // ONLY sync slots that are marked as "Free" (no subject assigned)
+            // If subject is null/undefined, it's a free period
+            if (!slot.subject) {
+                // Check if this slot already exists for this teacher on this date
+                const existing = await Appointment.findOne({
+                    teacher: req.user._id,
+                    date: targetDate,
+                    startTime: slot.start
+                });
+
+                if (!existing) {
+                    const newSlot = await Appointment.create({
+                        teacher: req.user._id,
+                        date: targetDate,
+                        startTime: slot.start,
+                        endTime: slot.end,
+                        status: 'available',
+                        appointmentType: 'slot',
+                    });
+                    createdSlots.push(newSlot);
+                }
+            }
+        }
+    }
+
+    res.status(201).json({
+        message: `Successfully synced ${createdSlots.length} free periods as available slots.`,
+        count: createdSlots.length
+    });
+};
+
 module.exports = {
     bookAppointment,
     getMyAppointments,
@@ -292,4 +373,5 @@ module.exports = {
     getAvailableSlots,
     bookSlot,
     cancelSlot,
+    syncTimetableSlots,
 };
