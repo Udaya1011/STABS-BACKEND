@@ -102,14 +102,12 @@ io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
     socket.on('join', (userId) => {
-        socket.join(userId);
-        socket.userId = userId;
-        console.log(`User ${userId} joined their private room`);
-    });
-
-    socket.on('sendMessage', (data) => {
-        const { receiverId, message } = data;
-        io.to(receiverId).emit('newMessage', message);
+        if (userId) {
+            const roomName = userId.toString();
+            socket.join(roomName);
+            socket.userId = roomName;
+            console.log(`User ${roomName} joined their private room`);
+        }
     });
 
     // WebRTC Signaling Events

@@ -109,10 +109,19 @@ const sendMessage = async (req, res) => {
 
         const io = req.app.get('socketio');
         if (io) {
-            io.to(receiver).emit('newMessage', populatedMessage);
-            // Also notify unread count change
-            const unreadCount = await Message.countDocuments({ receiver, isRead: false, sender: req.user._id });
-            io.to(receiver).emit('unreadUpdate', { sender: req.user._id, count: unreadCount });
+            const messageObj = populatedMessage.toObject();
+            const receiverStr = receiver.toString();
+            const senderStr = req.user._id.toString();
+
+            // Emit to receiver
+            io.to(receiverStr).emit('newMessage', messageObj);
+
+            // Also emit to sender (to sync across multiple tabs/devices)
+            io.to(senderStr).emit('newMessage', messageObj);
+
+            // Also notify unread count change to receiver
+            const unreadCount = await Message.countDocuments({ receiver: receiverStr, isRead: false, sender: senderStr });
+            io.to(receiverStr).emit('unreadUpdate', { sender: senderStr, count: unreadCount });
         }
 
         res.status(201).json(populatedMessage);
