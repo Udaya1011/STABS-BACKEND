@@ -62,7 +62,8 @@ const authUser = async (req, res, next) => {
                             studentId: studentProfile._id,
                             registerNumber: studentProfile.registerNumber,
                             attendance: studentProfile.attendance,
-                            semester: studentProfile.semester
+                            semester: studentProfile.semester,
+                            academicYear: studentProfile.academicYear
                         };
                     }
                 } else if (user.role === 'teacher') {
@@ -82,6 +83,10 @@ const authUser = async (req, res, next) => {
                     role: user.role,
                     avatar: user.avatar,
                     department: user.department,
+                    phone: user.phone,
+                    address: user.address,
+                    username: user.username,
+                    bio: user.bio,
                     ...extraData,
                     token: generateToken(user._id),
                 });
@@ -204,13 +209,43 @@ const registerUser = async (req, res, next) => {
                 console.error(`Warning: User registered but email failure to ${email}:`, mailError.message);
             }
 
+            // Fetch full user with population for consistent response
+            const fullUser = await User.findById(user._id).populate('department', 'name programme');
+            
+            let extraData = {};
+            if (fullUser.role === 'student') {
+                const studentProfile = await Student.findOne({ user: fullUser._id });
+                if (studentProfile) {
+                    extraData = {
+                        registerNumber: studentProfile.registerNumber,
+                        studentId: studentProfile._id,
+                        semester: studentProfile.semester,
+                        academicYear: studentProfile.academicYear
+                    };
+                }
+            } else if (fullUser.role === 'teacher') {
+                const teacherProfile = await Teacher.findOne({ user: fullUser._id });
+                if (teacherProfile) {
+                    extraData = {
+                        teacherId: teacherProfile._id,
+                        designation: teacherProfile.designation
+                    };
+                }
+            }
+
             res.status(201).json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                avatar: user.avatar,
-                token: generateToken(user._id),
+                _id: fullUser._id,
+                name: fullUser.name,
+                email: fullUser.email,
+                role: fullUser.role,
+                avatar: fullUser.avatar,
+                department: fullUser.department,
+                phone: fullUser.phone,
+                address: fullUser.address,
+                username: fullUser.username,
+                bio: fullUser.bio,
+                ...extraData,
+                token: generateToken(fullUser._id),
             });
         } else {
             res.status(400);
@@ -226,15 +261,44 @@ const registerUser = async (req, res, next) => {
 // @access  Private
 const getUserProfile = async (req, res, next) => {
     try {
-        const user = await User.findById(req.user._id);
+        const user = await User.findById(req.user._id).populate('department', 'name programme');
 
         if (user) {
+            let extraData = {};
+            if (user.role === 'student') {
+                const studentProfile = await Student.findOne({ user: user._id })
+                    .populate('attendance.subject', 'name code');
+                if (studentProfile) {
+                    extraData = {
+                        studentId: studentProfile._id,
+                        registerNumber: studentProfile.registerNumber,
+                        attendance: studentProfile.attendance,
+                        semester: studentProfile.semester,
+                        academicYear: studentProfile.academicYear
+                    };
+                }
+            } else if (user.role === 'teacher') {
+                const teacherProfile = await Teacher.findOne({ user: user._id });
+                if (teacherProfile) {
+                    extraData = {
+                        teacherId: teacherProfile._id,
+                        designation: teacherProfile.designation
+                    };
+                }
+            }
+
             res.json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
                 avatar: user.avatar,
+                department: user.department,
+                phone: user.phone,
+                address: user.address,
+                username: user.username,
+                bio: user.bio,
+                ...extraData
             });
         } else {
             res.status(404);
@@ -268,13 +332,43 @@ const updateUserProfile = async (req, res, next) => {
 
             const updatedUser = await user.save();
 
+            // Re-fetch with population for consistency
+            const fullUser = await User.findById(updatedUser._id).populate('department', 'name programme');
+            
+            let extraData = {};
+            if (fullUser.role === 'student') {
+                const studentProfile = await Student.findOne({ user: fullUser._id });
+                if (studentProfile) {
+                    extraData = {
+                        registerNumber: studentProfile.registerNumber,
+                        studentId: studentProfile._id,
+                        semester: studentProfile.semester,
+                        academicYear: studentProfile.academicYear
+                    };
+                }
+            } else if (fullUser.role === 'teacher') {
+                const teacherProfile = await Teacher.findOne({ user: fullUser._id });
+                if (teacherProfile) {
+                    extraData = {
+                        teacherId: teacherProfile._id,
+                        designation: teacherProfile.designation
+                    };
+                }
+            }
+
             res.json({
-                _id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                role: updatedUser.role,
-                avatar: updatedUser.avatar,
-                token: generateToken(updatedUser._id),
+                _id: fullUser._id,
+                name: fullUser.name,
+                email: fullUser.email,
+                role: fullUser.role,
+                avatar: fullUser.avatar,
+                department: fullUser.department,
+                phone: fullUser.phone,
+                address: fullUser.address,
+                username: fullUser.username,
+                bio: fullUser.bio,
+                ...extraData,
+                token: generateToken(fullUser._id),
             });
         } else {
             res.status(404);
@@ -352,7 +446,8 @@ const loginWithFace = async (req, res, next) => {
                         studentId: studentProfile._id,
                         registerNumber: studentProfile.registerNumber,
                         attendance: studentProfile.attendance,
-                        semester: studentProfile.semester
+                        semester: studentProfile.semester,
+                        academicYear: studentProfile.academicYear
                     };
                 }
             } else if (matchedUser.role === 'teacher') {
@@ -372,6 +467,10 @@ const loginWithFace = async (req, res, next) => {
                 role: matchedUser.role,
                 avatar: matchedUser.avatar,
                 department: matchedUser.department,
+                phone: matchedUser.phone,
+                address: matchedUser.address,
+                username: matchedUser.username,
+                bio: matchedUser.bio,
                 ...extraData,
                 token: generateToken(matchedUser._id),
             });

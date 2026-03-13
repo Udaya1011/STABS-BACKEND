@@ -14,7 +14,7 @@ const uploadVideo = async (req, res) => {
             return res.status(400).json({ message: 'No video file uploaded' });
         }
 
-        const { title, description, subject, category } = req.body;
+        const { title, description, subject, category, department } = req.body;
 
         if (!title || !subject) {
             return res.status(400).json({ message: 'Title and Subject are required' });
@@ -28,6 +28,7 @@ const uploadVideo = async (req, res) => {
             description: description || '',
             url: videoUrl,
             subject,
+            department: department || null,
             teacher: req.user._id,
             category: category || 'Lecture',
         });
@@ -43,9 +44,23 @@ const uploadVideo = async (req, res) => {
 // @desc    Get all videos
 const getVideos = async (req, res) => {
     try {
-        const videos = await Video.find({})
+        let query = {};
+        
+        // If student, only show videos for their department/batch or global ones
+        if (req.user.role === 'student' && req.user.department) {
+            query = {
+                $or: [
+                    { department: req.user.department },
+                    { department: { $exists: false } },
+                    { department: null }
+                ]
+            };
+        }
+
+        const videos = await Video.find(query)
             .populate('subject', 'name code')
             .populate('teacher', 'name avatar')
+            .populate('department', 'name programme className')
             .sort({ createdAt: -1 });
         res.json(videos);
     } catch (error) {
@@ -98,12 +113,13 @@ const updateVideo = async (req, res) => {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        const { title, description, subject, category } = req.body;
+        const { title, description, subject, category, department } = req.body;
 
         video.title = title || video.title;
         video.description = description || video.description;
         video.subject = subject || video.subject;
         video.category = category || video.category;
+        video.department = department || video.department;
 
         const updatedVideo = await video.save();
         res.json(updatedVideo);

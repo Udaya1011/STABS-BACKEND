@@ -29,6 +29,10 @@ const videoSchema = new mongoose.Schema({
         default: 0,
     },
     category: String,
+    department: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Department',
+    },
     thumbnail: String,
 }, { timestamps: true });
 

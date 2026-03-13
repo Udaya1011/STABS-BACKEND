@@ -46,11 +46,11 @@ const admin = (req, res, next) => {
 };
 
 const teacher = (req, res, next) => {
-    if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin')) {
+    if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin' || req.user.role === 'staff')) {
         next();
     } else {
         res.status(403);
-        next(new Error('Not authorized as a teacher'));
+        next(new Error('Not authorized as an instructor'));
     }
 };
 
