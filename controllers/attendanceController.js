@@ -94,7 +94,13 @@ exports.getSubjectAttendance = async (req, res) => {
     try {
         const records = await Attendance.find({ subject: req.params.subjectId })
             .populate('faculty', 'name email')
-            .populate('students.student', 'name registerNumber')
+            .populate({
+                path: 'students.student',
+                populate: {
+                    path: 'user',
+                    select: 'name'
+                }
+            })
             .sort('-date');
 
         res.status(200).json({

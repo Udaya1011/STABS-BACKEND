@@ -5,23 +5,72 @@ const User = require('../models/User');
 // @route   GET /api/students
 // @access  Private/Admin
 const getStudents = async (req, res) => {
-    const query = {};
-    if (req.query.subjectId) {
-        query.subjects = req.query.subjectId;
+    try {
+        const { subjectId, department, year, semester } = req.query;
+        console.log('--- STUDENT SYNCHRONIZATION (V4) ---');
+        console.log('Query Params:', { subjectId, department, year, semester });
+        
+        const semNum = semester && semester !== 'undefined' ? Number(semester) : null;
+        let students = [];
+
+        // PRIORITY 1: Subject-Specific Enrollment
+        // If a teacher selects a subject, we show ALL students linked to that subject
+        // regardless of whether their Year/Sem labels match the current selection.
+        if (subjectId && subjectId.match(/^[0-9a-fA-F]{24}$/)) {
+            console.log(`Syncing via Subject ID: ${subjectId}`);
+            students = await Student.find({ subjects: subjectId }).populate('user');
+        }
+
+        // PRIORITY 2: Profile-based Fallback (No Subject match or No Subject Selected)
+        if (students.length === 0) {
+            console.log('Subject match empty or missing. Falling back to Profile-based search...');
+            let profileQuery = {};
+            
+            // Semester Matching (Reliable)
+            if (semNum !== null) {
+                profileQuery.$or = [{ semester: semNum }, { semester: String(semNum) }];
+            }
+            
+            // Year Matching (Regex for "Year 2" -> "2" etc)
+            if (year && year !== 'undefined' && year !== '') {
+                profileQuery.academicYear = { $regex: year, $options: 'i' };
+            }
+
+            // Department Matching
+            if (department && department !== 'undefined' && department.match(/^[0-9a-fA-F]{24}$/)) {
+                const users = await User.find({ department }).select('_id');
+                if (users.length > 0) {
+                    profileQuery.user = { $in: users.map(u => u._id) };
+                } else {
+                    profileQuery.user = null;
+                }
+            }
+
+            console.log('Profile Query Map:', JSON.stringify(profileQuery));
+            students = await Student.find(profileQuery).populate('user');
+        }
+
+        // PRIORITY 3: Global Semester Safeguard
+        if (students.length === 0 && semNum !== null) {
+            console.log('Profile match empty. Falling back to Semester-only safeguard...');
+            students = await Student.find({ 
+                $or: [{ semester: semNum }, { semester: String(semNum) }] 
+            }).populate('user');
+        }
+
+        // Hydrate all data for the frontend
+        students = await Student.populate(students, [
+            { path: 'user', populate: { path: 'department' } },
+            { path: 'subjects' },
+            { path: 'attendance.subject' }
+        ]);
+
+        console.log(`Roster complete: ${students.length} students found.`);
+        res.json(students);
+    } catch (error) {
+        console.error('SERVER ERROR (getStudents):', error);
+        res.status(500).json({ message: 'Failed to synchronize student registry' });
     }
-
-    const students = await Student.find(query)
-        .populate({
-            path: 'user',
-            select: 'name email department avatar',
-            populate: { path: 'department', select: 'name programme' }
-        })
-        .populate('attendance.subject', 'name code');
-
-    // Log for debugging
-    console.log(`Found ${students.length} students in database`);
-
-    res.json(students);
 };
 
 // @desc    Update student (Admin)
