@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const path = require('path');
 const morgan = require('morgan');
 const socketio = require('socket.io');
-const connectDB = require('./config/db');
+const { connectDB } = require('./config/db');
 
 // Database connection managed via startServer() below
 

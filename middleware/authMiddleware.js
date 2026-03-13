@@ -40,7 +40,7 @@ const admin = (req, res, next) => {
         next();
     } else {
         console.warn('Admin Access Denied for:', req.user?.email, 'Role:', req.user?.role);
-        res.status(401);
+        res.status(403);
         next(new Error('Not authorized as an admin'));
     }
 };
@@ -49,7 +49,7 @@ const teacher = (req, res, next) => {
     if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin')) {
         next();
     } else {
-        res.status(401);
+        res.status(403);
         next(new Error('Not authorized as a teacher'));
     }
 };
@@ -58,7 +58,7 @@ const student = (req, res, next) => {
     if (req.user && (req.user.role === 'student' || req.user.role === 'admin')) {
         next();
     } else {
-        res.status(401);
+        res.status(403);
         next(new Error('Not authorized as a student'));
     }
 };
@@ -67,7 +67,7 @@ const staff = (req, res, next) => {
     if (req.user && (req.user.role === 'staff' || req.user.role === 'admin')) {
         next();
     } else {
-        res.status(401);
+        res.status(403);
         next(new Error('Not authorized as staff'));
     }
 };

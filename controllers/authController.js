@@ -10,49 +10,88 @@ const sendEmail = require('../utils/sendEmail');
 const authUser = async (req, res, next) => {
     try {
         const { email, password } = req.body;
+        const loginId = email.trim();
+        console.log('Login Attempt:', { loginId, passwordProvided: !!password });
 
-        const user = await User.findOne({
+        let user = await User.findOne({
             $or: [
-                { email: email.trim() },
-                { username: email.trim() }
+                { email: { $regex: new RegExp(`^${loginId}$`, 'i') } },
+                { username: { $regex: new RegExp(`^${loginId}$`, 'i') } }
             ]
         }).populate('department', 'name programme');
 
-        if (user && (await user.matchPassword(password))) {
-            let extraData = {};
+        // If user not found by email/username, check if it's a Student's Register Number (case-insensitive)
+        if (!user) {
+            console.log('User not found by email/username, checking Register Number...');
+            const student = await Student.findOne({ 
+                registerNumber: { $regex: new RegExp(`^${loginId}$`, 'i') } 
+            });
             
-            if (user.role === 'student') {
-                const studentProfile = await Student.findOne({ user: user._id })
-                    .populate('attendance.subject', 'name code');
+            if (student) {
+                console.log('Found Student by Reg Number:', student.registerNumber);
+                user = await User.findById(student.user).populate('department', 'name programme');
+            }
+        }
+
+        if (user) {
+            console.log('User model found for role:', user.role);
+            let passwordMatch = await user.matchPassword(password);
+            console.log('Normal password match result:', passwordMatch);
+            
+            // Fallback for students: allow login with registerNumber as password
+            if (!passwordMatch && user.role === 'student') {
+                const studentProfile = await Student.findOne({ user: user._id });
                 if (studentProfile) {
-                    extraData = {
-                        studentId: studentProfile._id,
-                        registerNumber: studentProfile.registerNumber,
-                        attendance: studentProfile.attendance,
-                        semester: studentProfile.semester
-                    };
-                }
-            } else if (user.role === 'teacher') {
-                const teacherProfile = await Teacher.findOne({ user: user._id });
-                if (teacherProfile) {
-                    extraData = {
-                        teacherId: teacherProfile._id,
-                        designation: teacherProfile.designation
-                    };
+                    // Case-insensitive password match for reg number
+                    if (studentProfile.registerNumber.toLowerCase() === password.toLowerCase()) {
+                        console.log('Student matched using Register Number as password');
+                        passwordMatch = true;
+                    }
                 }
             }
 
-            res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                avatar: user.avatar,
-                department: user.department,
-                ...extraData,
-                token: generateToken(user._id),
-            });
+            if (passwordMatch) {
+                console.log('Login SUCCESS for:', user.email);
+                let extraData = {};
+                
+                if (user.role === 'student') {
+                    const studentProfile = await Student.findOne({ user: user._id })
+                        .populate('attendance.subject', 'name code');
+                    if (studentProfile) {
+                        extraData = {
+                            studentId: studentProfile._id,
+                            registerNumber: studentProfile.registerNumber,
+                            attendance: studentProfile.attendance,
+                            semester: studentProfile.semester
+                        };
+                    }
+                } else if (user.role === 'teacher') {
+                    const teacherProfile = await Teacher.findOne({ user: user._id });
+                    if (teacherProfile) {
+                        extraData = {
+                            teacherId: teacherProfile._id,
+                            designation: teacherProfile.designation
+                        };
+                    }
+                }
+
+                res.json({
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    avatar: user.avatar,
+                    department: user.department,
+                    ...extraData,
+                    token: generateToken(user._id),
+                });
+            } else {
+                console.log('Password mismatch for user:', user.email);
+                res.status(401);
+                throw new Error('Invalid email or password');
+            }
         } else {
+            console.log('User not found in database');
             res.status(401);
             throw new Error('Invalid email or password');
         }
@@ -79,10 +118,23 @@ const registerUser = async (req, res, next) => {
             throw new Error('User already exists');
         }
 
+        let finalPassword = password;
+        let finalUsername = req.body.username;
+
+        if (role === 'student') {
+            if (!registerNumber) {
+                res.status(400);
+                throw new Error('Register number is required for students');
+            }
+            finalUsername = registerNumber;
+            finalPassword = registerNumber;
+        }
+
         const user = await User.create({
             name,
             email,
-            password,
+            password: finalPassword,
+            username: finalUsername,
             role,
             department: department || null,
         });
@@ -119,12 +171,12 @@ const registerUser = async (req, res, next) => {
                     
                     <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 20px; margin: 25px 0;">
                         <div style="margin-bottom: 15px;">
-                            <span style="color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 5px;">Portal Email</span>
-                            <span style="color: #1e293b; font-size: 16px; font-weight: 600;">${email}</span>
+                            <span style="color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 5px;">${role === 'student' ? 'Register Number (Username)' : 'Portal Email'}</span>
+                            <span style="color: #1e293b; font-size: 16px; font-weight: 600;">${role === 'student' ? registerNumber : email}</span>
                         </div>
                         <div>
                             <span style="color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 5px;">Temporary Password</span>
-                            <span style="color: #1e293b; font-size: 16px; font-weight: 600;">${password}</span>
+                            <span style="color: #1e293b; font-size: 16px; font-weight: 600;">${finalPassword}</span>
                         </div>
                     </div>
                     
@@ -144,7 +196,7 @@ const registerUser = async (req, res, next) => {
                 await sendEmail({
                     email: email,
                     subject: `Credentials Synchronized - Welcome to ${role === 'student' ? 'Student' : 'Faculty'} Portal`,
-                    message: `Welcome to the Academic Portal. Your account has been initialized.\n\nEmail: ${email}\nPassword: ${password}\n\nPlease update your password after logging in.`,
+                    message: `Welcome to the Academic Portal. Your account has been initialized.\n\nEmail: ${email}\nPassword: ${finalPassword}\n\nPlease update your password after logging in.`,
                     html: emailTemplate,
                 });
                 console.log(`Success: Registration credentials dispatched to ${email}`);
