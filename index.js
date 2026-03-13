@@ -116,7 +116,7 @@ io.on('connection', (socket) => {
     socket.on('rtc-offer', (data) => {
         const { to, offer, senderName, callType } = data;
         const from = data.from || socket.userId;
-        console.log(`[WebRTC] OFFER from ${from} to ${to} (Sender: ${senderName}, Type: ${callType || 'voice'})`);
+        console.log(`[WebRTC] OFFER from ${from} to ${to}`);
         io.to(to).emit('rtc-offer', { from, offer, senderName, callType });
     });
 
@@ -125,19 +125,21 @@ io.on('connection', (socket) => {
         const from = data.from || socket.userId;
         console.log(`[WebRTC] ANSWER from ${from} to ${to}`);
         io.to(to).emit('rtc-answer', { answer });
+        // Notify other tabs of the receiver that the call was answered elsewhere
+        socket.to(from).emit('rtc-answered-elsewhere');
     });
 
     socket.on('rtc-candidate', (data) => {
         const { to, candidate } = data;
-        const from = data.from || socket.userId;
-        console.log(`[WebRTC] ICE CANDIDATE from ${from} to ${to}`);
         io.to(to).emit('rtc-candidate', { candidate });
     });
 
     socket.on('rtc-end', (data) => {
         const { to } = data;
-        console.log(`[WebRTC] END CALL to ${to}`);
+        const from = data.from || socket.userId;
+        console.log(`[WebRTC] END CALL from ${from} to ${to}`);
         io.to(to).emit('rtc-end');
+        io.to(from).emit('rtc-end'); // Sync other tabs of the person who ended it
     });
 
     socket.on('disconnect', () => {

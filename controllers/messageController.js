@@ -22,7 +22,9 @@ const getMessages = async (req, res) => {
             { sender: req.user._id, receiver: userId },
             { sender: userId, receiver: req.user._id },
         ],
-    }).sort({ createdAt: 1 });
+    })
+    .populate('sender', 'name avatar')
+    .sort({ createdAt: 1 });
 
     res.json(messages);
 };
@@ -113,7 +115,7 @@ const sendMessage = async (req, res) => {
             io.to(receiver).emit('unreadUpdate', { sender: req.user._id, count: unreadCount });
         }
 
-        res.status(201).json(message);
+        res.status(201).json(populatedMessage);
     } else {
         res.status(400);
         throw new Error('Invalid message data');
